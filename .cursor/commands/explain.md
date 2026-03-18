@@ -1,1 +1,1 @@
-../../ai-specs/.commands/explain.md
+../ai_specs_mc/.commands/explain.md

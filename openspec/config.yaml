@@ -1,0 +1,74 @@
+# OpenSpec Configuration — mp_core_context
+# SIM hardware control and pool management system
+# Source of truth: mp_simclient (hardware layer) + mapeo_pool (visualization layer)
+
+version: "1.0"
+name: mp-core
+description: >
+  Unified specification for the SIM hardware control system (SimBanks + Quectel modems),
+  slot management, production cycle orchestration, data scanning,
+  pool visualization, and deployment. Merges mp_simclient (Python Orchestrator)
+  and mapeo_pool (Flask + React + PostgreSQL) over the same physical infrastructure.
+
+language: en
+
+specs:
+  - path: specs/hardware-topology
+    name: Hardware Topology
+    description: >
+      Physical topology: SimBanks, control ports, Quectel modems (EC25/UC20),
+      serial ports, column-to-modem mapping, SIM rows.
+
+  - path: specs/hardware-control
+    name: Hardware Control
+    description: >
+      Hardware control layer: AT commands, SimController, retry_serial,
+      pool_locks, swit_global_lock, SimBank initialization.
+
+  - path: specs/slot-management
+    name: Slot Management
+    description: >
+      SIM slot management: circular rotation, persistent state (slot_state.json),
+      dynamic reload of lista_pos.json, validation filters.
+
+  - path: specs/orchestration
+    name: Orchestration
+    description: >
+      Main orchestrator (Orchestrator): production cycle, PortState,
+      barrier pattern, retries, round and row management.
+
+  - path: specs/data-scanning
+    name: Data Scanning
+    description: >
+      Hardware scanning: DataManager, parallel scanning per row,
+      progressive CSV saving, CCID verification, output file generation.
+
+  - path: specs/pool-visualization
+    name: Pool Visualization
+    description: >
+      Pool visualization: mapeo_pool Flask API, React frontend,
+      dict_nodo.json, REST endpoints, modem visual grid.
+
+  - path: specs/session-management
+    name: Session Management
+    description: >
+      Pool session management: PostgreSQL db1, pools_registry,
+      pool_sessions, pool_grid_snapshots (JSONB), 45-day retention.
+
+  - path: specs/configuration
+    name: Configuration
+    description: >
+      Configuration system: config.json (mp_simclient), dict_nodo.json (legacy),
+      format conversion, operational parameters and thresholds.
+
+  - path: specs/simclient-integration
+    name: SimClient Integration
+    description: >
+      SimClient integration (third-party software): launch, kill,
+      model detection, SMSHub marketplace interaction.
+
+  - path: specs/deployment
+    name: Deployment
+    description: >
+      Deployment and operations: directory structure, dependencies,
+      CLI arguments, logs, monitoring, system requirements.

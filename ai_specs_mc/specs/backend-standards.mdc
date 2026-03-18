@@ -1,0 +1,1043 @@
+---
+description: Backend development standards, best practices, and conventions for the mp-core Python application including Domain-Driven Design, SOLID principles, architecture patterns, API design, and testing practices
+globs: ["src/**/*.py", "tests/**/*.py", "requirements*.txt", "pyproject.toml", "setup.cfg", "alembic/**/*.py"]
+alwaysApply: true
+---
+
+# Backend Project Standards and Best Practices
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Technology Stack](#technology-stack)
+- [Architecture Overview](#architecture-overview)
+  - [Domain-Driven Design (DDD)](#domain-driven-design-ddd)
+  - [Layered Architecture](#layered-architecture)
+  - [Project Structure](#project-structure)
+- [Domain-Driven Design Principles](#domain-driven-design-principles)
+  - [Entities](#entities)
+  - [Value Objects](#value-objects)
+  - [Aggregates](#aggregates)
+  - [Repositories](#repositories)
+  - [Domain Services](#domain-services)
+  - [Additional Recommendations](#additional-recommendations)
+- [SOLID and DRY Principles](#solid-and-dry-principles)
+- [Coding Standards](#coding-standards)
+  - [Language and Naming Conventions](#language-and-naming-conventions)
+  - [Type Hints](#type-hints)
+  - [Error Handling](#error-handling)
+  - [Validation Patterns](#validation-patterns)
+  - [Logging Standards](#logging-standards)
+- [API Design Standards](#api-design-standards)
+- [Database Patterns](#database-patterns)
+- [Testing Standards](#testing-standards)
+- [Performance Best Practices](#performance-best-practices)
+- [Security Best Practices](#security-best-practices)
+- [Development Workflow](#development-workflow)
+
+---
+
+## Overview
+
+This document outlines the best practices, conventions, and standards used in the mp-core backend application. The backend follows Domain-Driven Design (DDD) principles and implements a layered architecture to ensure code consistency, maintainability, and scalability.
+
+## Technology Stack
+
+### Core Technologies
+- **Python 3.8+**: Runtime environment
+- **Flask**: Web application framework for REST APIs
+- **pyserial**: Serial communication with hardware (SimBanks, Quectel modems)
+
+### Database & ORM
+- **PostgreSQL**: Relational database
+- **psycopg2**: PostgreSQL database driver
+- **SQLAlchemy** (optional): ORM for structured data access
+- **Alembic** (optional): Database migration tool
+
+### Testing Framework
+- **pytest**: Testing framework with fixture support
+- **pytest-cov**: Code coverage measurement
+- **pytest-mock**: Mocking utilities
+- **Coverage Threshold**: 80% minimum for branches, functions, lines, and statements
+
+### Development Tools
+- **ruff**: Fast Python linter and formatter (replaces flake8 + black + isort)
+- **mypy** or **pyright**: Static type checking
+- **pre-commit**: Git hook management for automated checks
+
+## Architecture Overview
+
+> **Current state vs. target architecture**
+>
+> The production codebase currently uses a **monolithic architecture** — most logic lives in a few large files:
+> - `src/main.py` (~2000 lines) — orchestration, production cycle, Flask API
+> - `src/hardware_controller.py` (~740 lines) — SimController, AT commands, serial
+> - `src/data_manager.py` (~1730 lines) — scanning, CSV, data persistence
+> - `src/slot_logic.py` (~525 lines) — slot rotation logic
+> - `src/config/config_manager.py` — configuration loading
+>
+> The DDD layered structure described below is the **target architecture** for future refactoring. Scaffold stub files already exist in `src/hardware/`, `src/models/`, `src/orchestration/`, and `src/utils/` but are **not yet used** by production code.
+>
+> When working on existing production files, follow the conventions of the surrounding code. When creating **new** modules or refactoring, follow the DDD patterns below.
+
+### Domain-Driven Design (DDD)
+
+Domain-Driven Design is a methodology that focuses on modeling software according to business logic and domain knowledge. By centering development on a deep understanding of the domain, DDD facilitates the creation of complex systems.
+
+**Benefits:**
+- **Improved Communication**: Promotes a common language between developers and domain experts, improving communication and reducing interpretation errors.
+- **Clear Domain Models**: Helps build models that accurately reflect business rules and processes.
+- **High Maintainability**: By dividing the system into subdomains, it facilitates maintenance and software evolution.
+
+### Layered Architecture
+
+The backend follows a layered DDD architecture:
+
+**Presentation Layer** (`src/presentation/`)
+- Flask Blueprints handle HTTP requests/responses
+- Route definitions for API endpoints
+- Controllers use services from Application layer
+
+**Application Layer** (`src/application/`)
+- Services contain business logic and orchestration
+- Validators handle input validation (Pydantic or cerberus)
+- Services use repositories from Domain layer
+
+**Domain Layer** (`src/domain/`)
+- Models define core business entities
+- Repository interfaces (abstract base classes) define data access contracts
+- Pure business logic without external dependencies
+
+**Infrastructure Layer** (`src/infrastructure/`)
+- Database operations (PostgreSQL via psycopg2 or SQLAlchemy)
+- Repository implementations satisfy domain interfaces
+- Hardware communication (pyserial)
+- External service integrations
+
+### Project Structure
+
+```
+src/
+├── domain/
+│   ├── models/              # Domain entities (dataclasses or Pydantic)
+│   ├── repositories/        # Repository abstract base classes
+│   ├── services/            # Domain services (pure business logic)
+│   └── exceptions.py        # Domain-specific exceptions
+├── application/
+│   ├── services/            # Application services (orchestration)
+│   └── validators.py        # Input validation (Pydantic models)
+├── presentation/
+│   ├── blueprints/          # Flask Blueprints (route handlers)
+│   └── error_handlers.py    # Global error handling
+├── infrastructure/
+│   ├── database/            # DB connection, repositories impl
+│   ├── hardware/            # Serial port, AT commands, SimController
+│   ├── config.py            # Configuration management
+│   └── logger.py            # Logging setup
+├── main.py                  # Application entry point
+└── config.json              # Hardware topology configuration
+tests/
+├── unit/
+│   ├── domain/
+│   ├── application/
+│   └── infrastructure/
+├── integration/
+├── conftest.py              # Shared fixtures
+└── factories.py             # Test data factories
+requirements.txt
+requirements-dev.txt
+pyproject.toml
+```
+
+## Domain-Driven Design Principles
+
+### Entities
+
+Entities are objects with a distinct identity that persists over time.
+
+**Before:**
+```python
+# Previously, data might have been handled as a simple dict without methods.
+pool = {
+    "id": 1,
+    "name": "SimBank-A",
+    "ip_address": "192.168.1.10",
+    "status": "active"
+}
+```
+
+**After:**
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+from datetime import datetime
+
+
+@dataclass
+class Pool:
+    name: str
+    ip_address: str
+    status: str = "active"
+    id: Optional[int] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+    def activate(self) -> None:
+        self.status = "active"
+
+    def deactivate(self) -> None:
+        self.status = "inactive"
+```
+
+**Explanation**: `Pool` is an entity because it has a unique identifier (`id`) that distinguishes it from other pools, even if other properties are identical.
+
+**Best Practice**: Entities should encapsulate business logic related to their domain concept and maintain consistency of their internal state.
+
+### Value Objects
+
+Value Objects describe aspects of the domain without conceptual identity. They are defined by their attributes rather than an identifier.
+
+**Before:**
+```python
+# Handling modem info as a simple dict
+modem = {
+    "port": "COM3",
+    "model": "EC25",
+    "imei": "123456789012345"
+}
+```
+
+**After:**
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ModemInfo:
+    port: str
+    model: str
+    imei: str
+
+    def is_ec25(self) -> bool:
+        return self.model.upper() == "EC25"
+```
+
+**Explanation**: `ModemInfo` is a Value Object because two modems with the same port, model, and IMEI are considered equal. Using `frozen=True` ensures immutability.
+
+### Aggregates
+
+Aggregates are clusters of objects that must be treated as a unit. They have a root entity that enforces invariants and consistency boundaries.
+
+**Before:**
+```python
+# Pool and modem data handled separately
+pool = {"id": 1, "name": "SimBank-A"}
+modems = [{"pool_id": 1, "port": "COM3"}]
+```
+
+**After:**
+```python
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+
+@dataclass
+class Pool:
+    name: str
+    ip_address: str
+    id: Optional[int] = None
+    modems: List["Modem"] = field(default_factory=list)
+
+    def add_modem(self, modem: "Modem") -> None:
+        if len(self.modems) >= 8:
+            raise ValueError("A SimBank cannot have more than 8 modems")
+        self.modems.append(modem)
+```
+
+**Explanation**: `Pool` acts as an aggregate root that contains `Modem` entities. Operations that affect modems should be handled through the aggregate root to maintain integrity.
+
+### Repositories
+
+Repositories provide interfaces for accessing aggregates and entities, encapsulating data access logic.
+
+**Before:**
+```python
+# Direct database access without abstraction
+def get_pool_by_id(pool_id: int) -> dict:
+    cursor.execute("SELECT * FROM pools_registry WHERE id = %s", (pool_id,))
+    return cursor.fetchone()
+```
+
+**After:**
+```python
+from abc import ABC, abstractmethod
+from typing import Optional, List
+from domain.models.pool import Pool
+
+
+class PoolRepository(ABC):
+    """Abstract repository interface for Pool aggregate."""
+
+    @abstractmethod
+    def find_by_id(self, pool_id: int) -> Optional[Pool]:
+        ...
+
+    @abstractmethod
+    def save(self, pool: Pool) -> Pool:
+        ...
+
+    @abstractmethod
+    def find_all(self) -> List[Pool]:
+        ...
+
+
+# Infrastructure implementation
+class PostgresPoolRepository(PoolRepository):
+    def __init__(self, connection):
+        self._conn = connection
+
+    def find_by_id(self, pool_id: int) -> Optional[Pool]:
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT id, name, ip_address, status FROM pools_registry WHERE id = %s",
+            (pool_id,)
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return Pool(id=row[0], name=row[1], ip_address=row[2], status=row[3])
+
+    def save(self, pool: Pool) -> Pool:
+        # Implementation with PostgreSQL
+        ...
+```
+
+**Recommendation**: 
+- Define repository abstract base classes in the domain layer
+- Implement concrete repositories in the infrastructure layer
+- Use dependency injection to provide database connections
+
+### Domain Services
+
+Domain Services contain business logic that doesn't naturally belong to an entity or value object.
+
+**Before:**
+```python
+# Loose function to handle business logic
+def check_modem_health(port: str) -> bool:
+    import serial
+    ser = serial.Serial(port, 115200)
+    ser.write(b"AT\r\n")
+    response = ser.readline()
+    ser.close()
+    return b"OK" in response
+```
+
+**After:**
+```python
+from domain.models.modem import Modem
+
+
+class ModemHealthService:
+    """Domain service for modem health assessment."""
+
+    @staticmethod
+    def is_registered(modem: Modem) -> bool:
+        return modem.creg_status == 1
+
+    @staticmethod
+    def needs_reboot(modem: Modem, max_failures: int = 3) -> bool:
+        return modem.consecutive_failures >= max_failures
+```
+
+**Explanation**: `ModemHealthService` encapsulates business logic related to modem health, separate from the hardware communication layer.
+
+### Additional Recommendations
+
+**Use of Factories**
+
+Factories are useful in DDD to encapsulate the logic of creating complex objects, ensuring that all created objects comply with domain rules from the moment of creation.
+
+**Recommendation**: Implement factories for the creation of entities and aggregates, especially those that are complex and require specific initial configuration that complies with business rules.
+
+**Domain Events Integration**
+
+Domain events are an important part of DDD and can be used to handle side effects of domain operations in a decoupled manner.
+
+**Recommendation**: Implement a domain event system that allows entities and aggregates to publish events that other system components can handle without being tightly coupled to the entities that generate them.
+
+## SOLID and DRY Principles
+
+### Single Responsibility Principle (SRP)
+
+Each class/module should have a single responsibility or reason to change.
+
+**Before:**
+```python
+# A function that handles multiple responsibilities
+def process_scan_result(port: str, data: dict) -> None:
+    if not data.get("imei"):
+        print("Invalid data")
+        return
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO scans ...", (data,))
+    conn.commit()
+    print("Scan saved")
+```
+
+**After:**
+```python
+# Separate validation, persistence, and logging
+class ScanResult:
+    def __init__(self, port: str, imei: str, iccid: str):
+        self.port = port
+        self.imei = imei
+        self.iccid = iccid
+
+    def validate(self) -> None:
+        if not self.imei:
+            raise ValueError("IMEI is required for scan result")
+
+
+class ScanRepository:
+    def __init__(self, connection):
+        self._conn = connection
+
+    def save(self, scan: ScanResult) -> None:
+        scan.validate()
+        cursor = self._conn.cursor()
+        cursor.execute("INSERT INTO scans ...", (scan.imei, scan.iccid))
+        self._conn.commit()
+```
+
+### Open/Closed Principle (OCP)
+
+Software entities should be open for extension but closed for modification.
+
+```python
+from abc import ABC, abstractmethod
+
+
+class ModemCommand(ABC):
+    @abstractmethod
+    def execute(self, serial_conn) -> str:
+        ...
+
+
+class ATCommand(ModemCommand):
+    def execute(self, serial_conn) -> str:
+        serial_conn.write(b"AT\r\n")
+        return serial_conn.readline().decode()
+
+
+class SwitchSimCommand(ModemCommand):
+    def __init__(self, slot: int):
+        self.slot = slot
+
+    def execute(self, serial_conn) -> str:
+        serial_conn.write(f"AT+SWIT={self.slot}\r\n".encode())
+        return serial_conn.readline().decode()
+```
+
+### Liskov Substitution Principle (LSP)
+
+Objects of a derived class should be replaceable with objects of the base class.
+
+**Recommendation**: Use composition over inheritance. When inheritance is used, ensure derived classes can fully substitute their base classes.
+
+### Interface Segregation Principle (ISP)
+
+Prefer small, focused abstract classes over large ones.
+
+```python
+from abc import ABC, abstractmethod
+
+
+class Readable(ABC):
+    @abstractmethod
+    def read(self) -> str:
+        ...
+
+
+class Writable(ABC):
+    @abstractmethod
+    def write(self, data: str) -> None:
+        ...
+
+
+class SerialDevice(Readable, Writable):
+    def read(self) -> str:
+        # implementation
+        ...
+
+    def write(self, data: str) -> None:
+        # implementation
+        ...
+```
+
+### Dependency Inversion Principle (DIP)
+
+High-level modules should not depend on low-level modules; both should depend on abstractions.
+
+**Before:**
+```python
+import psycopg2
+
+
+class PoolService:
+    def __init__(self):
+        self.conn = psycopg2.connect("postgresql://...")
+
+    def get_pool(self, pool_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM pools_registry WHERE id = %s", (pool_id,))
+        return cursor.fetchone()
+```
+
+**After:**
+```python
+from domain.repositories.pool_repository import PoolRepository
+
+
+class PoolService:
+    def __init__(self, pool_repo: PoolRepository):
+        self._pool_repo = pool_repo
+
+    def get_pool(self, pool_id: int):
+        return self._pool_repo.find_by_id(pool_id)
+```
+
+### DRY (Don't Repeat Yourself)
+
+Each piece of knowledge should have a single, unambiguous, and authoritative representation.
+
+```python
+# Centralized AT command retry logic
+def retry_serial(func, max_retries: int = 3, delay: float = 1.0):
+    """Decorator for retrying serial operations."""
+    from functools import wraps
+    import time
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except serial.SerialException as e:
+                last_error = e
+                time.sleep(delay)
+        raise last_error
+
+    return wrapper
+```
+
+## Coding Standards
+
+### Naming Conventions (PEP 8)
+
+- **Variable/Function Naming**: Use `snake_case` (e.g., `pool_id`, `find_pool_by_id`)
+- **Class Naming**: Use `PascalCase` (e.g., `PoolService`, `SimController`)
+- **Constants Naming**: Use `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_BAUD_RATE`)
+- **Module/File Naming**: Use `snake_case` (e.g., `pool_service.py`, `sim_controller.py`)
+- **Private Members**: Prefix with underscore (e.g., `_internal_method`, `_conn`)
+- **Protected Members**: Prefix with single underscore (e.g., `_serial_port`)
+
+**Examples:**
+
+```python
+# Good: All in English, PEP 8 conventions
+class PoolRepository:
+    def find_by_id(self, pool_id: int) -> Optional[Pool]:
+        """Find a pool by its ID in the database."""
+        pool = self._conn.execute(
+            "SELECT * FROM pools_registry WHERE id = %s", (pool_id,)
+        )
+        return Pool(**pool) if pool else None
+
+# Avoid: Non-English names or non-PEP 8 conventions
+class RepositorioPool:
+    def buscarPorId(self, idPool: int):
+        """Buscar un pool por su ID en la base de datos."""
+        ...
+```
+
+**Error Messages and Logs:**
+
+```python
+# Good: English error messages
+raise NotFoundError("Pool not found with the provided ID")
+logger.error("Failed to initialize SimBank", extra={"error": str(e)})
+
+# Avoid: Non-English messages
+raise NotFoundError("Pool no encontrado con el ID proporcionado")
+logger.error("Error al inicializar SimBank", extra={"error": str(e)})
+```
+
+### Type Hints
+
+- **Always use type hints** for function parameters and return values (PEP 484)
+- Use `Optional[T]` for nullable values
+- Use `Union[T1, T2]` when multiple types are acceptable
+- Use `typing` module for complex types (`List`, `Dict`, `Tuple`, `Set`)
+- Avoid `Any` unless absolutely necessary; prefer `object` or specific types
+- Run `mypy` or `pyright` for static type validation
+
+```python
+# Good: Explicit type hints
+from typing import Optional, List
+
+
+def find_pool_by_id(pool_id: int) -> Optional[Pool]:
+    """Find a pool by its ID."""
+    ...
+
+
+def get_active_modems(pool: Pool) -> List[Modem]:
+    """Get all active modems in a pool."""
+    ...
+
+
+# Avoid: Missing type hints
+def process_data(data):
+    ...
+```
+
+### Error Handling
+
+- **Custom Exception Classes**: Create domain-specific exception hierarchies
+- **Error Middleware**: Use Flask error handlers for consistent error responses
+- **Descriptive Messages**: Provide descriptive error messages for debugging
+
+```python
+class DomainError(Exception):
+    """Base exception for domain errors."""
+    pass
+
+
+class NotFoundError(DomainError):
+    """Raised when a requested resource is not found."""
+    pass
+
+
+class HardwareError(DomainError):
+    """Raised when a hardware operation fails."""
+    pass
+
+
+class ValidationError(DomainError):
+    """Raised when input validation fails."""
+    pass
+
+
+# In Flask blueprint
+@blueprint.errorhandler(NotFoundError)
+def handle_not_found(error):
+    return {"success": False, "error": {"message": str(error), "code": "NOT_FOUND"}}, 404
+```
+
+### Validation Patterns
+
+- **Input Validation**: Validate all inputs at the application layer
+- **Use Pydantic**: Centralize validation logic with Pydantic models
+- **Validate Before Processing**: Always validate before executing business logic
+
+```python
+from pydantic import BaseModel, validator
+from typing import Optional
+
+
+class CreatePoolRequest(BaseModel):
+    name: str
+    ip_address: str
+    columns: int = 8
+    rows: int = 16
+
+    @validator("name")
+    def name_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Pool name cannot be empty")
+        return v.strip()
+
+    @validator("columns")
+    def columns_in_range(cls, v: int) -> int:
+        if v < 1 or v > 16:
+            raise ValueError("Columns must be between 1 and 16")
+        return v
+```
+
+### Logging Standards
+
+- **Use Python logging module**: Configure centralized logging
+- **Log Levels**: Use appropriate levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- **Structured Logging**: Include relevant context in log messages
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.info("Pool initialized", extra={"pool_id": pool.id, "modems": len(pool.modems)})
+logger.error("Failed to switch SIM", extra={"port": port, "slot": slot, "error": str(e)})
+logger.warning("Modem not registered after reboot", extra={"port": port, "attempts": attempts})
+```
+
+## API Design Standards
+
+### REST Endpoints
+
+- **RESTful Naming**: Use RESTful conventions for endpoint naming
+- **HTTP Methods**: Use appropriate HTTP methods (GET, POST, PUT, DELETE, PATCH)
+- **Resource-Based URLs**: URLs should represent resources, not actions
+- **Flask Blueprints**: Group related endpoints in Blueprints
+
+```python
+# GET    /api/pools              # List pools
+# GET    /api/pools/<id>         # Get pool by ID
+# POST   /api/pools              # Create new pool
+# PUT    /api/pools/<id>         # Update pool
+# DELETE /api/pools/<id>         # Delete pool
+# GET    /api/pools/<id>/modems  # List modems in a pool
+```
+
+### Request/Response Patterns
+
+```python
+# Success response
+{
+    "success": True,
+    "data": { ... },
+    "message": "Operation completed successfully"
+}
+
+# Error response
+{
+    "success": False,
+    "error": {
+        "message": "Error description",
+        "code": "ERROR_CODE"
+    }
+}
+```
+
+### Flask Blueprint Example
+
+```python
+from flask import Blueprint, request, jsonify
+
+pool_bp = Blueprint("pools", __name__, url_prefix="/api/pools")
+
+
+@pool_bp.route("/", methods=["GET"])
+def list_pools():
+    pools = pool_service.find_all()
+    return jsonify({"success": True, "data": [p.to_dict() for p in pools]})
+
+
+@pool_bp.route("/<int:pool_id>", methods=["GET"])
+def get_pool(pool_id: int):
+    pool = pool_service.find_by_id(pool_id)
+    if pool is None:
+        return jsonify({"success": False, "error": {"message": "Pool not found", "code": "NOT_FOUND"}}), 404
+    return jsonify({"success": True, "data": pool.to_dict()})
+```
+
+### CORS Configuration
+
+```python
+from flask_cors import CORS
+
+cors = CORS(app, resources={
+    r"/api/*": {
+        "origins": os.environ.get("FRONTEND_URL", "http://localhost:3000"),
+        "supports_credentials": True
+    }
+})
+```
+
+## Database Patterns
+
+### Schema Management
+
+- **Single Source of Truth**: SQL migration files or SQLAlchemy models define the database structure
+- **Version Control**: All database changes must be version-controlled through migrations
+- **Naming Conventions**: Use `snake_case` for table and column names
+
+### Migrations (Alembic)
+
+```bash
+# Create migration
+alembic revision --autogenerate -m "descriptive_migration_name"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback
+alembic downgrade -1
+```
+
+### Repository Pattern
+
+```python
+# Domain layer interface
+from abc import ABC, abstractmethod
+from typing import Optional, List
+
+
+class PoolRepository(ABC):
+    @abstractmethod
+    def find_by_id(self, pool_id: int) -> Optional[Pool]:
+        ...
+
+    @abstractmethod
+    def save(self, pool: Pool) -> Pool:
+        ...
+
+
+# Infrastructure layer implementation
+class PostgresPoolRepository(PoolRepository):
+    def __init__(self, connection):
+        self._conn = connection
+
+    def find_by_id(self, pool_id: int) -> Optional[Pool]:
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT * FROM pools_registry WHERE id = %s", (pool_id,))
+        row = cursor.fetchone()
+        return Pool(**row) if row else None
+```
+
+## Testing Standards
+
+### Test File Structure
+- Use descriptive test file names: `test_[component_name].py`
+- Place tests in `tests/` directory mirroring `src/` structure
+- Use pytest as the testing framework
+- Maintain 80% minimum coverage threshold
+
+### Test Organization Pattern
+
+```python
+class TestPoolService:
+    """Tests for PoolService.find_by_id"""
+
+    def setup_method(self):
+        """Reset mocks before each test."""
+        self.mock_repo = Mock(spec=PoolRepository)
+        self.service = PoolService(pool_repo=self.mock_repo)
+
+    def test_should_return_pool_when_found(self):
+        # Arrange
+        pool = Pool(id=1, name="SimBank-A", ip_address="192.168.1.10")
+        self.mock_repo.find_by_id.return_value = pool
+
+        # Act
+        result = self.service.find_by_id(1)
+
+        # Assert
+        assert result == pool
+        self.mock_repo.find_by_id.assert_called_once_with(1)
+
+    def test_should_return_none_when_not_found(self):
+        # Arrange
+        self.mock_repo.find_by_id.return_value = None
+
+        # Act
+        result = self.service.find_by_id(999)
+
+        # Assert
+        assert result is None
+```
+
+### Test Naming Convention
+- Use descriptive names: `test_should_[expected]_when_[condition]`
+- Group related tests under descriptive classes: `TestPoolService`, `TestSimController`
+
+### Test Structure (AAA Pattern)
+Always follow Arrange-Act-Assert:
+```python
+def test_should_activate_pool_when_valid_id(self):
+    # Arrange - Set up test data and mocks
+    pool = Pool(id=1, name="SimBank-A", ip_address="192.168.1.10", status="inactive")
+    self.mock_repo.find_by_id.return_value = pool
+
+    # Act - Execute the function under test
+    result = self.service.activate(pool_id=1)
+
+    # Assert - Verify the expected behavior
+    assert result.status == "active"
+    self.mock_repo.save.assert_called_once()
+```
+
+### Fixtures and Factories
+
+```python
+# conftest.py
+import pytest
+from unittest.mock import Mock
+
+
+@pytest.fixture
+def mock_db_connection():
+    return Mock()
+
+
+@pytest.fixture
+def pool_factory():
+    def _create_pool(**kwargs):
+        defaults = {
+            "id": 1,
+            "name": "SimBank-A",
+            "ip_address": "192.168.1.10",
+            "status": "active",
+        }
+        defaults.update(kwargs)
+        return Pool(**defaults)
+    return _create_pool
+```
+
+### Mocking Standards
+
+- Mock all external dependencies (database, serial ports, external services)
+- Mock repository layers in service tests
+- Use `pytest-mock` or `unittest.mock`
+- Use `@patch` decorator or `mocker` fixture
+- Create mock instances with realistic data structures
+
+### Test Coverage Requirements
+
+- **Comprehensive test coverage**: Include these test categories for each function:
+  1. **Happy Path Tests**: Valid inputs producing expected outputs
+  2. **Error Handling Tests**: Invalid inputs, missing data, database errors
+  3. **Edge Cases**: Boundary values, None inputs, empty collections
+  4. **Validation Tests**: Input validation, business rule enforcement
+  5. **Integration Points**: External service calls, database operations
+
+- **Threshold**: 80% minimum for branches, functions, lines, and statements
+- **Coverage Reports**: Generate with `pytest --cov=src --cov-report=html`
+
+### Common Anti-Patterns to Avoid
+- Don't test implementation details, test behavior
+- Don't create overly complex test setups
+- Don't ignore failing tests or skip error scenarios
+- Don't use real database connections in unit tests
+- Don't create tests that depend on external hardware
+- Don't write tests that are too tightly coupled to implementation
+
+## Performance Best Practices
+
+### Database Query Optimization
+
+- **Select Specific Fields**: Only select columns that are needed
+- **Use Indexes**: Ensure proper database indexes for frequently queried fields
+- **Avoid N+1 Queries**: Use JOINs or batch queries to fetch related data efficiently
+- **Connection Pooling**: Use connection pools (e.g., `psycopg2.pool`) for database connections
+
+### Concurrency Patterns
+
+- **Threading**: Use `threading.Lock` for shared resource protection
+- **ThreadPoolExecutor**: Use `concurrent.futures.ThreadPoolExecutor` for parallel I/O operations
+- **Barrier Pattern**: Use `threading.Barrier` for synchronized multi-device operations
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+with ThreadPoolExecutor(max_workers=8) as executor:
+    futures = {executor.submit(scan_modem, port): port for port in ports}
+    for future in as_completed(futures):
+        port = futures[future]
+        try:
+            result = future.result()
+        except Exception as e:
+            logger.error("Scan failed for port %s: %s", port, e)
+```
+
+### Error Handling Performance
+
+- **Early Returns**: Return early to avoid unnecessary processing
+- **Error Propagation**: Let errors propagate naturally through the call stack
+- **Avoid Over-Wrapping**: Don't wrap exceptions unnecessarily
+
+## Security Best Practices
+
+### Input Validation
+
+- **Validate All Inputs**: Validate all user inputs before processing
+- **Sanitize Data**: Sanitize data to prevent injection attacks
+- **Parameterized Queries**: Always use parameterized queries, never string interpolation
+
+```python
+# Good: Parameterized query
+cursor.execute("SELECT * FROM pools_registry WHERE id = %s", (pool_id,))
+
+# NEVER: String interpolation (SQL injection risk)
+cursor.execute(f"SELECT * FROM pools_registry WHERE id = {pool_id}")
+```
+
+### Environment Variables
+
+- **Never Commit Secrets**: Never commit `.env` files or secrets to version control
+- **Use Environment Variables**: Use environment variables for configuration
+- **Validate at Startup**: Validate required environment variables at startup
+
+```python
+import os
+
+REQUIRED_ENV_VARS = ["DATABASE_URL", "SECRET_KEY"]
+
+for var_name in REQUIRED_ENV_VARS:
+    if not os.environ.get(var_name):
+        raise RuntimeError(f"Missing required environment variable: {var_name}")
+```
+
+### Dependency Injection
+
+- **Inject Dependencies**: Inject database connections, repositories, and services via constructors
+- **Avoid Global State**: Avoid global mutable state for connections
+- **Testability**: Use dependency injection to improve testability
+
+## Development Workflow
+
+### Git Workflow
+
+- **Feature Branches**: Develop features in separate branches (`feature/[task-id]`)
+- **Descriptive Commits**: Write descriptive commit messages in English
+- **Code Review**: Code review before merging
+- **Small Branches**: Keep branches small and focused
+
+### Development Scripts
+
+```bash
+# Run application
+python src/main.py
+
+# Run Flask dev server
+flask --app src/main:app run --debug
+
+# Run tests
+pytest
+
+# Run tests with coverage
+pytest --cov=src --cov-report=html
+
+# Lint and format
+ruff check src/ tests/
+ruff format src/ tests/
+
+# Type checking
+mypy src/
+
+# Create database migration
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+```
+
+### Code Quality
+
+- **Ruff Validation**: Run ruff before commits for linting and formatting
+- **Type Checking**: Ensure mypy passes without errors
+- **All Tests Passing**: Ensure all tests pass before deployment
+- **Code Review**: Review code for adherence to standards
+
+This document serves as the foundation for maintaining code quality and consistency across the mp-core backend application. Follow these practices to ensure a maintainable, scalable, and testable codebase.

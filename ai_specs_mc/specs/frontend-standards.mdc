@@ -1,0 +1,463 @@
+---
+description: Frontend development standards, best practices, and conventions for the mp-core visualization layer including React dashboards, Streamlit dashboards, UI/UX guidelines, and component architecture
+globs: ["frontend/**/*.{js,jsx,ts,tsx}", "dashboards/**/*.py", "streamlit_apps/**/*.py"]
+alwaysApply: true
+---
+
+# Frontend Project Standards and Best Practices
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Technology Stack](#technology-stack)
+- [Dual Dashboard Strategy](#dual-dashboard-strategy)
+- [React Dashboards (Full-featured)](#react-dashboards-full-featured)
+  - [Project Structure](#react-project-structure)
+  - [Component Conventions](#component-conventions)
+  - [State Management](#state-management)
+  - [Service Layer Architecture](#service-layer-architecture)
+  - [Navigation Patterns](#navigation-patterns)
+- [Streamlit Dashboards (Quick/Lightweight)](#streamlit-dashboards-quicklightweight)
+  - [Project Structure](#streamlit-project-structure)
+  - [Page Conventions](#page-conventions)
+  - [State Management](#streamlit-state-management)
+  - [Data Loading Patterns](#data-loading-patterns)
+  - [Layout Patterns](#layout-patterns)
+- [UI/UX Standards](#uiux-standards)
+  - [Accessibility](#accessibility)
+  - [Responsive Design](#responsive-design)
+- [Coding Standards](#coding-standards)
+  - [Naming Conventions](#naming-conventions)
+- [Testing Standards](#testing-standards)
+- [Performance Best Practices](#performance-best-practices)
+- [Development Workflow](#development-workflow)
+
+---
+
+## Overview
+
+This document outlines the best practices, conventions, and standards for the mp-core visualization layer. The project uses a **dual dashboard strategy**: React for full-featured, complex dashboards and Streamlit for quick, lightweight dashboards.
+
+## Technology Stack
+
+### React Dashboards (Full-featured)
+- **React 18+**: Modern React with functional components and hooks
+- **React Router DOM**: Client-side routing and navigation
+- **Axios**: HTTP client for API communication with Flask backend
+- **Charting**: Recharts, Chart.js, or Plotly.js for data visualization
+
+### Streamlit Dashboards (Quick/Lightweight)
+- **Streamlit**: Python-native dashboard framework
+- **Plotly**: Interactive charts via `st.plotly_chart`
+- **Pandas**: Data manipulation and display via `st.dataframe`
+- **Altair**: Declarative statistical visualizations (optional)
+
+### Shared Backend
+- **Flask REST API**: Both React and Streamlit consume the same Flask API endpoints
+- **Direct DB access**: Streamlit apps may also read directly from PostgreSQL for simplicity
+
+## Dual Dashboard Strategy
+
+| Criteria | React | Streamlit |
+|---|---|---|
+| **Use when** | Complex interactions, real-time updates, multi-page apps | Quick data exploration, internal tools, prototyping |
+| **Examples** | Modem grid visualization, pool management UI | Scan result viewer, hardware status report, CSV analyzer |
+| **Interactivity** | Full (drag-drop, modals, forms, websockets) | Widgets (sliders, selectors, buttons) |
+| **Deployment** | Built static files served by Flask or nginx | `streamlit run app.py` on server |
+| **State** | React hooks, context | `st.session_state` |
+| **Update frequency** | Real-time / polling | On-demand / auto-rerun |
+
+---
+
+## React Dashboards (Full-featured)
+
+### React Project Structure
+
+```
+frontend/
+├── public/                 # Static assets
+├── src/
+│   ├── components/        # Reusable UI components
+│   │   ├── common/        # Shared components (Spinner, Alert, etc.)
+│   │   ├── grid/          # Modem grid visualization components
+│   │   └── charts/        # Chart wrapper components
+│   ├── services/          # API service layer
+│   ├── pages/             # Page-level components
+│   ├── hooks/             # Custom React hooks
+│   ├── utils/             # Helper functions
+│   ├── types/             # TypeScript type definitions
+│   ├── App.tsx            # Main application component
+│   └── index.tsx          # Application entry point
+├── package.json
+└── tsconfig.json
+```
+
+### Component Conventions
+
+#### Functional Components
+- **Always use functional components** with hooks
+- Use **TypeScript** for all new components (`.tsx`)
+- Keep components focused on a single responsibility
+
+```typescript
+import React, { useState, useEffect } from "react";
+
+type ModemCellProps = {
+    port: string;
+    status: "registered" | "unregistered" | "error" | "empty" | "switching";
+    phone?: string;
+    iccid?: string;
+    onClick?: (port: string) => void;
+};
+
+const ModemCell: React.FC<ModemCellProps> = ({ port, status, phone, iccid, onClick }) => {
+    const statusColors: Record<string, string> = {
+        registered: "#4caf50",
+        unregistered: "#ffeb3b",
+        error: "#f44336",
+        empty: "#9e9e9e",
+        switching: "#2196f3",
+    };
+
+    return (
+        <div
+            className="modem-cell"
+            style={{ backgroundColor: statusColors[status] }}
+            onClick={() => onClick?.(port)}
+            title={`${phone || "N/A"} | ${iccid || "N/A"}`}
+        >
+            {port}
+        </div>
+    );
+};
+
+export default ModemCell;
+```
+
+### State Management
+
+- Use **useState** for component-level state
+- Use **useEffect** for side effects and data fetching
+- **Extract custom hooks** for reusable stateful logic
+- No global state library required unless complexity demands it
+
+```typescript
+// Custom hook for polling data
+function usePoolData(poolId: number, intervalMs: number = 30000) {
+    const [data, setData] = useState<PoolData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const result = await poolService.getPoolStatus(poolId);
+                setData(result);
+                setError(null);
+            } catch (err) {
+                setError("Failed to fetch pool data");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        const interval = setInterval(fetchData, intervalMs);
+        return () => clearInterval(interval);
+    }, [poolId, intervalMs]);
+
+    return { data, loading, error };
+}
+```
+
+### Service Layer Architecture
+
+- **Centralize API calls** in service files
+- Use **axios** for HTTP requests
+- **Handle errors at service level**
+- Use environment variables for API base URL
+
+```typescript
+import axios from "axios";
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
+export const poolService = {
+    getPoolStatus: async (poolId: number) => {
+        const response = await axios.get(`${API_BASE_URL}/pools/${poolId}`);
+        return response.data;
+    },
+
+    getModemGrid: async (poolId: number) => {
+        const response = await axios.get(`${API_BASE_URL}/pools/${poolId}/grid`);
+        return response.data;
+    },
+};
+```
+
+### Navigation Patterns
+
+- Use **React Router** for all navigation
+- Use **programmatic navigation** with `useNavigate`
+- Keep route definitions centralized
+
+```typescript
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+function App() {
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/pools/:poolId" element={<PoolDetail />} />
+                <Route path="/scans" element={<ScanResults />} />
+            </Routes>
+        </BrowserRouter>
+    );
+}
+```
+
+---
+
+## Streamlit Dashboards (Quick/Lightweight)
+
+### Streamlit Project Structure
+
+```
+streamlit_apps/
+├── pages/                  # Multi-page app pages
+│   ├── 1_scan_viewer.py
+│   ├── 2_hardware_status.py
+│   └── 3_session_history.py
+├── components/             # Reusable Streamlit components
+│   ├── filters.py
+│   └── charts.py
+├── utils/                  # Helper functions
+│   ├── db.py               # Database connection helpers
+│   └── formatting.py       # Data formatting utilities
+├── app.py                  # Main entry point (home page)
+└── .streamlit/
+    └── config.toml         # Streamlit configuration
+```
+
+### Page Conventions
+
+- **One file per page** in the `pages/` directory
+- **Prefix with number** for ordering (e.g., `1_scan_viewer.py`)
+- **Set page config** at the top of each page
+- **Keep pages focused** on a single dashboard view
+
+```python
+import streamlit as st
+import pandas as pd
+from utils.db import get_connection
+
+
+st.set_page_config(page_title="Scan Viewer", page_icon="📡", layout="wide")
+st.title("Hardware Scan Results")
+
+
+# Sidebar filters
+with st.sidebar:
+    st.header("Filters")
+    date_range = st.date_input("Date Range", value=[])
+    pool_filter = st.selectbox("Pool", options=["All", "SimBank-A", "SimBank-B"])
+
+
+# Data loading with caching
+@st.cache_data(ttl=300)
+def load_scan_data(pool: str) -> pd.DataFrame:
+    conn = get_connection()
+    query = "SELECT * FROM scan_results"
+    if pool != "All":
+        query += f" WHERE pool_name = '{pool}'"
+    return pd.read_sql(query, conn)
+
+
+data = load_scan_data(pool_filter)
+
+# Display
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Scans", len(data))
+col2.metric("Active Modems", data[data["status"] == "active"].shape[0])
+col3.metric("Errors", data[data["status"] == "error"].shape[0])
+
+st.dataframe(data, use_container_width=True)
+```
+
+### Streamlit State Management
+
+- Use **`st.session_state`** for persistent state across reruns
+- **Initialize state** with defaults at the top of the app
+- **Avoid global variables** for mutable state
+
+```python
+# Initialize state
+if "selected_pool" not in st.session_state:
+    st.session_state.selected_pool = None
+
+if "refresh_count" not in st.session_state:
+    st.session_state.refresh_count = 0
+
+
+# Update state via callbacks
+def on_pool_select():
+    st.session_state.refresh_count += 1
+
+
+st.selectbox(
+    "Select Pool",
+    options=pool_list,
+    key="selected_pool",
+    on_change=on_pool_select,
+)
+```
+
+### Data Loading Patterns
+
+- **Use `@st.cache_data`** for data that changes infrequently (queries, file reads)
+- **Use `@st.cache_resource`** for shared resources (DB connections, ML models)
+- **Set TTL** to control cache expiration
+
+```python
+@st.cache_resource
+def get_db_connection():
+    """Cached database connection (shared across users)."""
+    import psycopg2
+    return psycopg2.connect(os.environ["DATABASE_URL"])
+
+
+@st.cache_data(ttl=60)
+def load_pool_status(_conn, pool_id: int) -> dict:
+    """Cached pool status query (refreshes every 60s)."""
+    cursor = _conn.cursor()
+    cursor.execute("SELECT * FROM pools_registry WHERE id = %s", (pool_id,))
+    return cursor.fetchone()
+```
+
+### Layout Patterns
+
+```python
+# Columns for metrics
+col1, col2, col3 = st.columns(3)
+
+# Tabs for different views
+tab1, tab2 = st.tabs(["Grid View", "Table View"])
+with tab1:
+    st.plotly_chart(grid_figure, use_container_width=True)
+with tab2:
+    st.dataframe(data)
+
+# Expander for details
+with st.expander("Modem Details"):
+    st.json(modem_data)
+
+# Sidebar for configuration
+with st.sidebar:
+    st.header("Settings")
+    refresh_rate = st.slider("Refresh Rate (seconds)", 10, 300, 60)
+```
+
+---
+
+## UI/UX Standards
+
+### Dashboard Design Principles
+
+1. **Data density**: Dashboards should show relevant data at a glance without scrolling
+2. **Color coding**: Use consistent color semantics across all dashboards:
+   - Green: healthy/registered/active
+   - Yellow: warning/unregistered/degraded
+   - Red: error/failed/critical
+   - Gray: empty/inactive/unknown
+   - Blue: in-progress/switching/transitioning
+3. **Tooltips**: Provide detailed information on hover/click, not inline
+4. **Auto-refresh**: Dashboard data should refresh periodically (configurable)
+
+### Accessibility
+
+- Include **aria-label** attributes for interactive elements (React)
+- Use **semantic HTML** elements
+- Ensure **keyboard navigation** support
+- Provide **alternative text** for charts and images
+
+### Responsive Design
+
+- Use CSS Grid or Flexbox for layouts (React)
+- Use `layout="wide"` and `st.columns()` for responsive layouts (Streamlit)
+- Test on common screen resolutions
+
+## Coding Standards
+
+### Naming Conventions
+
+**React (TypeScript/JavaScript):**
+- **Component Naming**: PascalCase (e.g., `ModemGrid`, `PoolStatus`)
+- **Variable/Function Naming**: camelCase (e.g., `poolId`, `handleRefresh`)
+- **File Naming**: PascalCase for components (e.g., `ModemGrid.tsx`), camelCase for services (e.g., `poolService.ts`)
+- **Hook Naming**: camelCase with "use" prefix (e.g., `usePoolData`)
+
+**Streamlit (Python):**
+- Follow PEP 8 conventions (see backend-standards.mdc)
+- **Page file naming**: snake_case with numeric prefix (e.g., `1_scan_viewer.py`)
+- **Component file naming**: snake_case (e.g., `filter_components.py`)
+
+**Both:**
+- **English Only**: All names, comments, UI labels, and error messages in English
+- **Constants**: UPPER_SNAKE_CASE (e.g., `API_BASE_URL`, `REFRESH_INTERVAL`)
+
+## Testing Standards
+
+### React Testing
+- Use **React Testing Library** for component tests
+- Use **Jest** for unit tests
+- Test component rendering, user interactions, and data display
+- Mock API calls in tests
+
+### Streamlit Testing
+- Use **pytest** for utility function tests
+- Test data loading functions independently
+- Test formatting and transformation logic
+- Manual testing for UI layout (Streamlit lacks automated UI testing)
+
+## Performance Best Practices
+
+### React
+- **Lazy load** components with `React.lazy()` for large dashboards
+- **Memoize** expensive calculations with `useMemo`
+- **Prevent unnecessary re-renders** with `useCallback` and `React.memo`
+- **Polling intervals**: Use configurable intervals (default 30s for production data)
+
+### Streamlit
+- **Cache aggressively** with `@st.cache_data` and `@st.cache_resource`
+- **Set appropriate TTL** based on data freshness requirements
+- **Limit displayed rows** in `st.dataframe` for large datasets
+- **Use `st.spinner()`** for long-running operations
+
+## Development Workflow
+
+### Git Workflow
+- **Feature Branches**: `feature/[task-id]` for new features
+- **Descriptive Commits**: In English, describing what changed
+- **Small Branches**: Keep branches focused
+
+### Development Scripts
+
+```bash
+# React dashboard
+cd frontend && npm start          # Development server
+cd frontend && npm test           # Run unit tests
+cd frontend && npm run build      # Production build
+
+# Streamlit dashboard
+streamlit run streamlit_apps/app.py    # Run main dashboard
+streamlit run streamlit_apps/pages/1_scan_viewer.py  # Run specific page
+```
+
+### Code Quality
+- **ESLint** for React code
+- **ruff** for Streamlit Python code
+- **TypeScript compilation** without errors (React)
+- **mypy** for type checking (Streamlit Python)
+
+This document serves as the foundation for maintaining consistency across all visualization components of the mp-core system. Both React and Streamlit dashboards should follow these conventions for a coherent user experience.

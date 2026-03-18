@@ -1,1 +1,1 @@
-../../ai-specs/.commands/commit.md
+../ai_specs_mc/.commands/commit.md

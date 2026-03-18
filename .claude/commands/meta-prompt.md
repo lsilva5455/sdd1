@@ -1,1 +1,1 @@
-../../ai-specs/.commands/meta-prompt.md
+../ai_specs_mc/.commands/meta-prompt.md

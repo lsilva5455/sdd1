@@ -1,0 +1,167 @@
+{
+  "filas": 16,
+  "baudrate": 115200,
+  "at_timeout": 1,
+  "cambio_fila_minutos": 30,
+  "sim_intento_operativo": 5,
+  "sdata_iteraciones": 2,
+  "sdata_intervalo_iteracion_segundos": 4,
+  "switch_wait_seconds": 3.2,
+  "reboot_stabilization_seconds": 15,
+  "network_registration_first_seconds": 20,
+  "network_registration_retry_seconds": 5,
+  "max_workers": 16,
+  "output_identities": "~\\Documents\\sadmin_ext\\numeros\\lista_sim_actual.txt",
+  "mirror_signal_data": "",
+  "simclient_exec_path": "~\\AppData\\Local\\HeroSMS-Partners\\HeroSMS-Partners.exe",
+  "simbanks": [
+    {
+      "control_port": "COM35",
+      "modems": [
+        {
+          "port": "COM3",
+          "col": "01"
+        },
+        {
+          "port": "COM4",
+          "col": "02"
+        },
+        {
+          "port": "COM5",
+          "col": "03"
+        },
+        {
+          "port": "COM6",
+          "col": "04"
+        },
+        {
+          "port": "COM7",
+          "col": "05"
+        },
+        {
+          "port": "COM8",
+          "col": "06"
+        },
+        {
+          "port": "COM9",
+          "col": "07"
+        },
+        {
+          "port": "COM10",
+          "col": "08"
+        }
+      ]
+    },
+    {
+      "control_port": "COM36",
+      "modems": [
+        {
+          "port": "COM11",
+          "col": "01"
+        },
+        {
+          "port": "COM12",
+          "col": "02"
+        },
+        {
+          "port": "COM13",
+          "col": "03"
+        },
+        {
+          "port": "COM14",
+          "col": "04"
+        },
+        {
+          "port": "COM15",
+          "col": "05"
+        },
+        {
+          "port": "COM16",
+          "col": "06"
+        },
+        {
+          "port": "COM17",
+          "col": "07"
+        },
+        {
+          "port": "COM18",
+          "col": "08"
+        }
+      ]
+    },
+    {
+      "control_port": "COM37",
+      "modems": [
+        {
+          "port": "COM19",
+          "col": "01"
+        },
+        {
+          "port": "COM20",
+          "col": "02"
+        },
+        {
+          "port": "COM21",
+          "col": "03"
+        },
+        {
+          "port": "COM22",
+          "col": "04"
+        },
+        {
+          "port": "COM23",
+          "col": "05"
+        },
+        {
+          "port": "COM24",
+          "col": "06"
+        },
+        {
+          "port": "COM25",
+          "col": "07"
+        },
+        {
+          "port": "COM26",
+          "col": "08"
+        }
+      ]
+    },
+    {
+      "control_port": "COM38",
+      "modems": [
+        {
+          "port": "COM27",
+          "col": "01"
+        },
+        {
+          "port": "COM28",
+          "col": "02"
+        },
+        {
+          "port": "COM29",
+          "col": "03"
+        },
+        {
+          "port": "COM30",
+          "col": "04"
+        },
+        {
+          "port": "COM31",
+          "col": "05"
+        },
+        {
+          "port": "COM32",
+          "col": "06"
+        },
+        {
+          "port": "COM33",
+          "col": "07"
+        },
+        {
+          "port": "COM34",
+          "col": "08"
+        }
+      ]
+    }
+  ]
+}

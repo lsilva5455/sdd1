@@ -1,0 +1,1 @@
+Use `ai_specs_mc/specs/documentation-standards.mdc` to update whatever documentation is needed according to the changes made

@@ -1,1 +1,1 @@
-ai-specs/specs/base-standards.mdc
+ai_specs_mc/specs/base-standards.mdc
