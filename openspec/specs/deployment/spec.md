@@ -59,11 +59,15 @@ mp_core_context/
 ├── 
 │   ├── src/
 │   │   ├── main.py              ← Orchestrator (entry point)
+│   │   ├── version.py           ← Project version constant
 │   │   ├── hardware_controller.py ← SimController
 │   │   ├── slot_logic.py         ← SlotManager
 │   │   ├── data_manager.py       ← DataManager
 │   │   ├── ccid_analyzer.py      ← CCIDAnalyzer
-│   │   └── reset_imei_all.py     ← IMEI reset utility
+│   │   ├── reset_imei_all.py     ← IMEI reset utility
+│   │   └── utils/
+│   │       ├── __init__.py       ← Package init
+│   │       └── banner.py         ← Startup banner display
 │   ├── config.json               ← Topology and parameter configuration
 │   ├── requirements.txt          ← Python dependencies
 │   └── [runtime files]

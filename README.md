@@ -76,6 +76,7 @@ The production code uses a **monolithic architecture**. Scaffold subdirectories 
 ```
 src/
 ├── main.py                  # Orchestrator & entry point (~2000 lines)
+├── version.py               # Project version constant (__version__)
 ├── hardware_controller.py   # SimController — serial ports, AT commands (~740 lines)
 ├── data_manager.py          # DataManager — scanning, CSV, persistence (~1730 lines)
 ├── slot_logic.py            # SlotManager — circular slot rotation (~525 lines)
@@ -87,7 +88,9 @@ src/
 ├── hardware/                # [SCAFFOLD] Future hardware abstraction layer
 ├── models/                  # [SCAFFOLD] Future domain models
 ├── orchestration/           # [SCAFFOLD] Future orchestration services
-└── utils/                   # [SCAFFOLD] Future utility modules
+└── utils/
+    ├── __init__.py           # Package init
+    └── banner.py             # Startup banner — ASCII art and system info display
 ```
 
 ## Multi-Copilot Support
