@@ -32,6 +32,7 @@ Both integrate with multiple AI copilots (Claude, Cursor, GitHub Copilot, Gemini
 │   │   ├── fullstack-developer.md   # Unified developer agent (Python + React/Streamlit)
 │   │   └── product-strategy-analyst.md  # Product analysis agent
 │   └── changes/                     # Task files and implementation plans
+│       └── archive/                 # Completed/archived task files
 │
 ├── openspec/                        # Spec-Driven Development (OpenSpec)
 │   ├── config.yaml                  # Project config (mp-core)
@@ -134,7 +135,7 @@ This project has **two workflow systems** for different purposes:
 
 Use this for concrete implementation work: new endpoints, bug fixes, new views, refactors, feature additions.
 
-The pipeline is: **create task file -> enrich -> plan -> develop**
+The pipeline is: **create task file -> enrich -> plan -> develop -> archive**
 
 #### Step 1: Create the Task File
 
@@ -220,6 +221,17 @@ The AI follows the plan and:
 6. Commits with a descriptive message
 7. Pushes and creates a pull request
 
+#### Step 5: Archive Completed Task
+
+Once the task is fully implemented, tested, committed, and pushed (or PR merged), move all task files to the archive:
+
+```bash
+# Move completed task files to archive
+mv ai_specs_mc/changes/scan-ccid-validation*.md ai_specs_mc/changes/archive/
+```
+
+This keeps `ai_specs_mc/changes/` clean — only active/in-progress tasks remain at the top level. Completed tasks are preserved in `archive/` for reference.
+
 #### Complete Example
 
 ```
@@ -234,6 +246,9 @@ The AI follows the plan and:
 
 # 4. Implement
 /develop scan-ccid-validation_enriched
+
+# 5. Archive completed task files
+mv ai_specs_mc/changes/scan-ccid-validation*.md ai_specs_mc/changes/archive/
 ```
 
 #### Available Commands Reference

@@ -122,6 +122,21 @@ This step is **mandatory** and must be completed **before committing**:
    ```
 3. If the repo uses branch protection, note that the PR is ready for review once checks pass.
 
+## 9. Archive completed task files
+
+Once the implementation is complete (committed, pushed, PR created):
+
+1. Move all task-related files to the archive:
+   ```bash
+   git mv ai_specs_mc/changes/$ARGUMENTS.md ai_specs_mc/changes/archive/
+   git mv ai_specs_mc/changes/$ARGUMENTS_enriched.md ai_specs_mc/changes/archive/
+   git mv ai_specs_mc/changes/$ARGUMENTS_enriched_plan.md ai_specs_mc/changes/archive/
+   ```
+2. Commit the archive move: `git commit -m "chore: Archive completed $ARGUMENTS task files"`
+3. Push the commit.
+
+This keeps `ai_specs_mc/changes/` clean — only active tasks remain at the top level.
+
 # Output
 
 After completing all steps, provide a summary:
