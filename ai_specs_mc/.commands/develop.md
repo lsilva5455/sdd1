@@ -89,27 +89,9 @@ npx eslint src/ --fix
 
 Fix any issues found by the linters.
 
-## 6. Commit
+## 6. Update documentation
 
-1. Stage only the files related to this task.
-2. Write a descriptive commit message in English:
-   - **Subject**: Short imperative summary, optionally prefixed with task ID (e.g., `pool-health: Add health check endpoint and service`)
-   - **Body**: Bullet points describing what changed and why
-3. Commit: `git commit -m "subject" -m "body"`
-4. Do not commit secrets, `.env`, or generated artifacts.
-
-## 7. Push and Pull Request
-
-1. Push the branch: `git push -u origin feature/$ARGUMENTS`
-2. Create a Pull Request using `gh` CLI:
-   ```bash
-   gh pr create --title "[TASK-ID] Feature description" --body "## Summary\n- What was implemented\n- Key decisions\n\n## Testing\n- How it was tested\n- Coverage results"
-   ```
-3. If the repo uses branch protection, note that the PR is ready for review once checks pass.
-
-## 8. Update documentation
-
-This step is **mandatory** before considering implementation complete:
+This step is **mandatory** and must be completed **before committing**:
 
 1. Review all code changes made during implementation.
 2. Identify which documentation needs updates:
@@ -118,6 +100,27 @@ This step is **mandatory** before considering implementation complete:
    - New dependencies → Update `requirements.txt` / `package.json` and relevant standards
 3. Update documentation following `ai_specs_mc/specs/documentation-standards.mdc`.
 4. All documentation in English.
+
+> **Note:** Per `documentation-standards.mdc`, documentation must always be updated *before* any commit or push. Never defer documentation to a later step.
+
+## 7. Commit
+
+1. Verify that documentation has been updated (step 6). Do not proceed if it has not.
+2. Stage only the files related to this task (including documentation changes from step 6).
+3. Write a descriptive commit message in English:
+   - **Subject**: Short imperative summary, optionally prefixed with task ID (e.g., `pool-health: Add health check endpoint and service`)
+   - **Body**: Bullet points describing what changed and why
+4. Commit: `git commit -m "subject" -m "body"`
+5. Do not commit secrets, `.env`, or generated artifacts.
+
+## 8. Push and Pull Request
+
+1. Push the branch: `git push -u origin feature/$ARGUMENTS`
+2. Create a Pull Request using `gh` CLI:
+   ```bash
+   gh pr create --title "[TASK-ID] Feature description" --body "## Summary\n- What was implemented\n- Key decisions\n\n## Testing\n- How it was tested\n- Coverage results"
+   ```
+3. If the repo uses branch protection, note that the PR is ready for review once checks pass.
 
 # Output
 

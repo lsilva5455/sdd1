@@ -216,9 +216,9 @@ The AI follows the plan and:
 2. Implements each layer following DDD and project standards
 3. Writes tests (pytest for backend, Jest+RTL for frontend)
 4. Runs quality checks (ruff, mypy)
-5. Commits with a descriptive message
-6. Creates a pull request
-7. Updates documentation
+5. **Updates documentation** (mandatory — per `documentation-standards.mdc`, always before commit)
+6. Commits with a descriptive message
+7. Pushes and creates a pull request
 
 #### Complete Example
 
