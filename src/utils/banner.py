@@ -82,7 +82,7 @@ def _extract_capacity_info(config: dict[str, Any]) -> dict[str, str]:
     else:
         capacity = "N/A"
 
-    node = str(config.get("node", os.environ.get("MP_NODE", "N/A")))
+    node = str(config.get("nodo", os.environ.get("MP_NODE", "N/A")))
     flask_port = str(config.get("flask_port", "5000"))
 
     return {

@@ -49,7 +49,7 @@ def sample_config() -> dict:
             },
         ],
         "filas": 16,
-        "node": "N99",
+        "nodo": "N99",
         "flask_port": 8080,
     }
 
