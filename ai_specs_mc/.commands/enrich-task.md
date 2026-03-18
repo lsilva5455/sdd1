@@ -15,10 +15,23 @@ Read a local task description file, evaluate its completeness and clarity, and p
 ## 1. Read the task
 
 1. Read the task file from `ai_specs_mc/changes/$ARGUMENTS.md`. If the argument is a file path, read it directly.
-2. Read relevant specs in `ai_specs_mc/specs/` to understand the project context:
+2. Read relevant specs in `ai_specs_mc/specs/` to understand development standards:
    - `base-standards.mdc` — architecture principles, language, conventions
    - `backend-standards.mdc` — Python/Flask patterns
    - `frontend-standards.mdc` — React/Streamlit conventions
+3. Read relevant capability specs in `openspec/specs/` to understand the system architecture and domain context. Review specs that are related to the task — for example:
+   - `hardware-topology/spec.md` — SimBanks, ports, column-to-modem mapping
+   - `hardware-control/spec.md` — AT commands, SimController, retry_serial
+   - `slot-management/spec.md` — circular rotation, slot_state.json
+   - `orchestration/spec.md` — production cycle, PortState, barriers
+   - `data-scanning/spec.md` — DataManager, parallel scanning, CSV
+   - `pool-visualization/spec.md` — Flask API, React frontend, modem grid
+   - `session-management/spec.md` — PostgreSQL, pool sessions, JSONB snapshots
+   - `configuration/spec.md` — config.json, dict_nodo.json
+   - `simclient-integration/spec.md` — SimClient launch/kill, model detection
+   - `deployment/spec.md` — directory structure, CLI, logs, monitoring
+   
+   Only read the specs relevant to the task — do not read all of them unless the task is broad.
 
 ## 2. Evaluate completeness
 
@@ -118,6 +131,7 @@ Write the enriched task to `ai_specs_mc/changes/$ARGUMENTS_enriched.md` with the
 - `ai_specs_mc/specs/backend-standards.mdc` — Python/Flask development patterns
 - `ai_specs_mc/specs/frontend-standards.mdc` — React/Streamlit conventions
 - `ai_specs_mc/specs/documentation-standards.mdc` — Documentation standards
+- `openspec/specs/` — System capability specifications (architecture and domain context)
 
 # Notes
 
