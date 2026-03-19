@@ -1,0 +1,84 @@
+{
+  "filas": 16,
+  "baudrate": 115200,
+  "at_timeout": 3,
+  "cambio_fila_minutos": 5,
+  "output_identities": "~\\Documents\\sadmin_ext\\numeros\\lista_sim_actual.txt",
+  "simclient_exec_path": "~\\AppData\\Local\\SimClient\\SimClient.exe",
+  "simbanks": [
+    {
+      "control_port": "COM19",
+      "modems": [
+        {
+          "port": "COM6",
+          "col": "01"
+        },
+        {
+          "port": "COM4",
+          "col": "02"
+        },
+        {
+          "port": "COM3",
+          "col": "03"
+        },
+        {
+          "port": "COM5",
+          "col": "04"
+        },
+        {
+          "port": "COM7",
+          "col": "05"
+        },
+        {
+          "port": "COM8",
+          "col": "06"
+        },
+        {
+          "port": "COM10",
+          "col": "07"
+        },
+        {
+          "port": "COM9",
+          "col": "08"
+        }
+      ]
+    },
+    {
+      "control_port": "COM20",
+      "modems": [
+        {
+          "port": "COM11",
+          "col": "01"
+        },
+        {
+          "port": "COM12",
+          "col": "02"
+        },
+        {
+          "port": "COM13",
+          "col": "03"
+        },
+        {
+          "port": "COM14",
+          "col": "04"
+        },
+        {
+          "port": "COM15",
+          "col": "05"
+        },
+        {
+          "port": "COM16",
+          "col": "06"
+        },
+        {
+          "port": "COM18",
+          "col": "07"
+        },
+        {
+          "port": "COM17",
+          "col": "08"
+        }
+      ]
+    }
+  ]
+}

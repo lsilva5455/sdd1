@@ -52,3 +52,4 @@ nul
 # Descomentar si config.json tiene credenciales:
 # config.json
 # config/config.json
+.coverage
