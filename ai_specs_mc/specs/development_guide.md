@@ -183,6 +183,7 @@ cd frontend && npx eslint src/
 sdd1/
 ├── src/                        # Python backend source
 │   ├── main.py                 # Application entry point & orchestrator (monolithic)
+│   ├── version.py              # Project version constant (__version__)
 │   ├── hardware_controller.py  # SimController — serial port & AT command control
 │   ├── data_manager.py         # DataManager — scanning, CSV, data persistence
 │   ├── slot_logic.py           # SlotManager — circular slot rotation
@@ -194,7 +195,9 @@ sdd1/
 │   ├── hardware/               # [SCAFFOLD] Future DDD hardware layer
 │   ├── models/                 # [SCAFFOLD] Future DDD domain models
 │   ├── orchestration/          # [SCAFFOLD] Future DDD orchestration layer
-│   └── utils/                  # [SCAFFOLD] Future DDD utilities
+│   └── utils/
+│       ├── __init__.py          # Package init
+│       └── banner.py            # Startup banner — ASCII art and system info
 ├── tests/                      # pytest test suite
 ├── openspec/                   # OpenSpec capability specifications
 ├── ai_specs_mc/                # AI agent specs and standards

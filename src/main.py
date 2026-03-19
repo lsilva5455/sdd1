@@ -25,6 +25,7 @@ from slot_logic import SlotManager
 from hardware_controller import SimController
 from logger_config import setup_logger, log_system_info, log_config_summary
 from ccid_analyzer import CCIDAnalyzer
+from utils.banner import print_startup_banner
 
 
 class PortState:
@@ -2280,6 +2281,8 @@ def show_menu():
 
 def main():
     """Función principal."""
+    print_startup_banner()
+
     # Parsear argumentos
     parser = argparse.ArgumentParser(description="MP_SIMCLIENT - Sistema SIM-Farming")
     parser.add_argument(

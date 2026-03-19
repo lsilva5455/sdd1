@@ -12,6 +12,7 @@ Primary format and source of truth. Hierarchical structure defining SimBanks, co
 
 ```json
 {
+  "nodo": "N99",
   "simbanks": {
     "COM19": {
       "columns": {
@@ -62,6 +63,12 @@ Simplified format used by mapeo_pool. Contains only topology (no operational par
 ```
 
 ## Operational Parameters
+
+### Identity
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `nodo` | String | — | Node identifier for this deployment (e.g., "N99"). Displayed in the startup banner and used to distinguish between multiple mp-core instances |
 
 ### Topology
 

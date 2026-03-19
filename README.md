@@ -32,6 +32,7 @@ Both integrate with multiple AI copilots (Claude, Cursor, GitHub Copilot, Gemini
 │   │   ├── fullstack-developer.md   # Unified developer agent (Python + React/Streamlit)
 │   │   └── product-strategy-analyst.md  # Product analysis agent
 │   └── changes/                     # Task files and implementation plans
+│       └── archive/                 # Completed/archived task files
 │
 ├── openspec/                        # Spec-Driven Development (OpenSpec)
 │   ├── config.yaml                  # Project config (mp-core)
@@ -76,6 +77,7 @@ The production code uses a **monolithic architecture**. Scaffold subdirectories 
 ```
 src/
 ├── main.py                  # Orchestrator & entry point (~2000 lines)
+├── version.py               # Project version constant (__version__)
 ├── hardware_controller.py   # SimController — serial ports, AT commands (~740 lines)
 ├── data_manager.py          # DataManager — scanning, CSV, persistence (~1730 lines)
 ├── slot_logic.py            # SlotManager — circular slot rotation (~525 lines)
@@ -87,7 +89,9 @@ src/
 ├── hardware/                # [SCAFFOLD] Future hardware abstraction layer
 ├── models/                  # [SCAFFOLD] Future domain models
 ├── orchestration/           # [SCAFFOLD] Future orchestration services
-└── utils/                   # [SCAFFOLD] Future utility modules
+└── utils/
+    ├── __init__.py           # Package init
+    └── banner.py             # Startup banner — ASCII art and system info display
 ```
 
 ## Multi-Copilot Support
@@ -131,7 +135,7 @@ This project has **two workflow systems** for different purposes:
 
 Use this for concrete implementation work: new endpoints, bug fixes, new views, refactors, feature additions.
 
-The pipeline is: **create task file -> enrich -> plan -> develop**
+The pipeline is: **create task file -> enrich -> plan -> develop -> archive**
 
 #### Step 1: Create the Task File
 
@@ -213,9 +217,20 @@ The AI follows the plan and:
 2. Implements each layer following DDD and project standards
 3. Writes tests (pytest for backend, Jest+RTL for frontend)
 4. Runs quality checks (ruff, mypy)
-5. Commits with a descriptive message
-6. Creates a pull request
-7. Updates documentation
+5. **Updates documentation** (mandatory — per `documentation-standards.mdc`, always before commit)
+6. Commits with a descriptive message
+7. Pushes and creates a pull request
+
+#### Step 5: Archive Completed Task
+
+Once the task is fully implemented, tested, committed, and pushed (or PR merged), move all task files to the archive:
+
+```bash
+# Move completed task files to archive
+mv ai_specs_mc/changes/scan-ccid-validation*.md ai_specs_mc/changes/archive/
+```
+
+This keeps `ai_specs_mc/changes/` clean — only active/in-progress tasks remain at the top level. Completed tasks are preserved in `archive/` for reference.
 
 #### Complete Example
 
@@ -231,6 +246,9 @@ The AI follows the plan and:
 
 # 4. Implement
 /develop scan-ccid-validation_enriched
+
+# 5. Archive completed task files
+mv ai_specs_mc/changes/scan-ccid-validation*.md ai_specs_mc/changes/archive/
 ```
 
 #### Available Commands Reference

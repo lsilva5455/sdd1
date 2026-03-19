@@ -1,1 +1,0 @@
-Al iniciar el programa necesito que se genere un icono usando * como pixeles. Luego de eso un mensaje en varios colores indicando datos del programa, capacidad, hora, etc

@@ -1,4 +1,5 @@
 {
+  "nodo": "N99",
   "filas": 16,
   "baudrate": 115200,
   "at_timeout": 1,
