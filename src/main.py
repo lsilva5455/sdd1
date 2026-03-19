@@ -760,32 +760,47 @@ class Orchestrator:
             f"📊 Logging de estado activado (cada {self.status_log_interval_minutes} min)"
         )
 
-        # Timeout: cambio_fila_minutos + 30s de margen
-        max_thread_wait = (self.cambio_fila_minutos * 60) + 30
+        # Timeout: cambio_fila_minutos + 60s de margen
+        max_thread_wait = (self.cambio_fila_minutos * 60) + 60
 
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Lanzar tareas normales (con round_end_time)
-            futures = [
-                executor.submit(self._process_single_port, *task, round_end_time)
-                for task in process_tasks
-            ]
-
-            # Lanzar tareas para puertos vacíos (con round_end_time)
-            futures.extend(
-                [
-                    executor.submit(self._process_empty_port, *task, round_end_time)
-                    for task in empty_port_tasks
+        futures: list = []
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # Lanzar tareas normales (con round_end_time)
+                futures = [
+                    executor.submit(self._process_single_port, *task, round_end_time)
+                    for task in process_tasks
                 ]
+
+                # Lanzar tareas para puertos vacíos (con round_end_time)
+                futures.extend(
+                    [
+                        executor.submit(self._process_empty_port, *task, round_end_time)
+                        for task in empty_port_tasks
+                    ]
+                )
+
+                # Esperar a que todos terminen (en paralelo, no secuencial)
+                self.logger.info("⏳ Esperando a que todos los puertos completen...")
+
+                for future in as_completed(futures, timeout=max_thread_wait):
+                    try:
+                        future.result()  # Capturar excepciones
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ Task generó excepción: {e}")
+        except TimeoutError:
+            # Some threads did not finish in time — log and continue gracefully
+            unfinished = sum(1 for f in futures if not f.done())
+            self.logger.warning(
+                f"⚠️ TimeoutError in parallel phase: {unfinished} of {len(futures)} futures unfinished after {max_thread_wait}s"
             )
-
-            # Esperar a que todos terminen (en paralelo, no secuencial)
-            self.logger.info("⏳ Esperando a que todos los puertos completen...")
-
-            for future in as_completed(futures, timeout=max_thread_wait):
-                try:
-                    future.result()  # Capturar excepciones
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Task generó excepción: {e}")
+            # Cancel queued-but-not-started futures
+            cancelled = sum(1 for f in futures if f.cancel())
+            if cancelled:
+                self.logger.info(f"   Cancelled {cancelled} queued futures")
+            self.logger.info(
+                "   Running threads will terminate naturally when they check round_end_time"
+            )
 
         elapsed = time.time() - start_time
         self.logger.info(f"✅ Fase paralela completada en {elapsed:.1f}s")
@@ -1382,7 +1397,7 @@ class Orchestrator:
 
                         # MAPEO COMPLETO: Probar todas las SIMs no registradas
                         registered_slots = self._complete_mapping_for_empty_port(
-                            port, pool_com, unregistered_slots, state
+                            port, pool_com, unregistered_slots, state, round_end_time
                         )
 
                         if registered_slots:
@@ -1423,8 +1438,11 @@ class Orchestrator:
                         results[port] = False
                         return
 
-                    # Esperar 15s antes de siguiente verificación
-                    time.sleep(15)
+                    # Time-aware sleep: check round_end_time every second
+                    for _ in range(15):
+                        if datetime.now() >= round_end_time:
+                            break
+                        time.sleep(1)
 
                 except Exception as e:
                     self.logger.warning(f"[{port}] ⚠️  Error verificando CREG: {e}")
@@ -1441,7 +1459,12 @@ class Orchestrator:
             )
 
     def _complete_mapping_for_empty_port(
-        self, port: str, pool_com: str, unregistered_slots: List[Dict], state: PortState
+        self,
+        port: str,
+        pool_com: str,
+        unregistered_slots: List[Dict],
+        state: PortState,
+        round_end_time: datetime,
     ) -> List[Dict]:
         """
         Mapea TODAS las SIMs no registradas para determinar cuáles SÍ se registran.
@@ -1452,6 +1475,7 @@ class Orchestrator:
             pool_com: Puerto COM del SimBank
             unregistered_slots: Lista completa de slots a probar
             state: Estado del puerto
+            round_end_time: Timestamp límite global de la ronda
 
         Returns:
             Lista de slots que se registraron (CREG=1 o 5)
@@ -1462,6 +1486,13 @@ class Orchestrator:
         self.logger.info(f"[{port}] 🗺️  Mapeando {total} SIMs no registradas...")
 
         for idx, slot in enumerate(unregistered_slots, 1):
+            # Check time boundary before processing next SIM
+            if datetime.now() >= round_end_time:
+                self.logger.warning(
+                    f"[{port}] ⏰ round_end_time reached during mapping at {idx}/{total}"
+                    f" — returning {len(registered_slots)} registered so far"
+                )
+                break
             fila = int(slot.get("fila"))
             col = slot.get("col")
             numero = slot.get("numero", "N/A")
@@ -2190,12 +2221,34 @@ class Orchestrator:
             self.shutdown()
 
     def shutdown(self):
-        """Apagado graceful del sistema."""
+        """Graceful system shutdown: stop logging, close serial ports, kill SimClient."""
         self.logger.info("=" * 70)
         self.logger.info("🛑 APAGANDO SISTEMA")
         self.logger.info("=" * 70)
 
         self.running = False
+
+        # Stop status logging thread
+        self.status_logging_active = False
+        if hasattr(self, "status_thread") and self.status_thread is not None:
+            try:
+                self.status_thread.join(timeout=5)
+                self.logger.info("Status logging thread stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping status thread: {e}")
+
+        # Close all tracked serial ports
+        if hasattr(self, "port_states"):
+            closed_count = 0
+            for port, state in self.port_states.items():
+                try:
+                    if state.serial_obj and state.serial_obj.is_open:
+                        state.serial_obj.close()
+                        closed_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Error closing serial port {port}: {e}")
+            if closed_count:
+                self.logger.info(f"Closed {closed_count} serial port(s)")
 
         # Terminar SimClient si está corriendo
         self.hardware.kill_simclient()
