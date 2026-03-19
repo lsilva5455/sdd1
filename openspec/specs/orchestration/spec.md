@@ -2,7 +2,7 @@
 
 ## Overview
 
-Specifies the main system orchestrator (`Orchestrator`), which manages the complete SIM production cycle: from hardware initialization to continuous network registration monitoring. Implemented in the `Orchestrator` class within `main.py` (1999 lines), it coordinates SimController, SlotManager, and DataManager in a multi-threaded flow with a barrier pattern.
+Specifies the main system orchestrator (`Orchestrator`), which manages the complete SIM production cycle: from hardware initialization to continuous network registration monitoring. Implemented in the `Orchestrator` class within `main.py` (~2441 lines), it coordinates SimController, SlotManager, and DataManager in a multi-threaded flow with a barrier pattern.
 
 ## Key Concepts
 
@@ -166,11 +166,13 @@ The Orchestrator accepts command-line arguments to control its behavior:
 - **SimBank doesn't respond to initialization**: Fatal error, the SimBank is excluded from the round.
 - **SimClient won't start**: Fatal error, the round is aborted.
 - **All ports fail**: Event is logged and the next round continues.
-- **User interruption**: Graceful handling of Ctrl+C, closing ports and terminating SimClient.
+- **TimeoutError in parallel phase**: When worker threads in `switch_reboot_and_release_parallel` exceed `max_thread_wait` (calculated as `cambio_fila_minutos * 60 + 60s` margin), the `TimeoutError` from `as_completed()` is caught gracefully. Unfinished futures are cancelled (queued-but-not-started only), running threads terminate naturally when they check `round_end_time`, and the system continues to the next cycle. The same pattern is used in `_retry_failed_ports`.
+- **Round time boundary enforcement**: `_complete_mapping_for_empty_port` checks `round_end_time` before processing each SIM slot, breaking early if the round deadline has passed. The 15-second stabilization sleep in `_process_empty_port` is time-aware (checks `round_end_time` every second).
+- **User interruption**: Graceful handling of Ctrl+C via `shutdown()`, which stops the status logging thread, closes all tracked serial ports (with per-port error handling), and terminates SimClient.
 
 ## Relevant Source Files
 
-- `src/main.py` — Orchestrator and PortState (1999 lines).
+- `src/main.py` — Orchestrator and PortState (~2441 lines).
 - `src/hardware_controller.py` — SimController invoked by Orchestrator.
 - `src/slot_logic.py` — SlotManager invoked by Orchestrator.
 - `legacy/sadmin_legacy_docs/CTX_04_Flujo_Actual_Legacy.md` — Legacy flow and FSM proposal (reference).
